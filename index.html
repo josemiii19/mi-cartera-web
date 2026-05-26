@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Cartera Móvil</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
+        h1 { font-size: 24px; text-align: center; color: #1e293b; margin-bottom: 20px; }
+        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 12px; display: flex; flex-direction: column; }
+        .fondo-nombre { font-weight: bold; font-size: 16px; color: #0f172a; margin-bottom: 5px; }
+        .fondo-ticker { font-size: 12px; color: #64748b; margin-bottom: 10px; }
+        .datos-fila { display: flex; justify-content: space-between; font-size: 14px; margin: 3px 0; }
+        .precio { font-weight: bold; color: #059669; }
+        .actualizando { text-align: center; color: #64748b; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <h1>📈 Mi Cartera</h1>
+    <div id="loading" class="actualizando">Cargando precios...</div>
+    <div id="contenedor-fondos"></div>
+
+    <script>
+        // URL del archivo público que copiará el robot (sin tokens ni historias)
+        const URL_CSV = "https://raw.githubusercontent.com/josemiii19/mi-cartera-web/main/precios_actuales_fondos.csv";
+
+        async function cargarCartera() {
+            try {
+                const respuesta = await fetch(URL_CSV);
+                if (!respuesta.ok) throw new Error("No se pudo obtener el archivo");
+                
+                const textoCsv = await respuesta.text();
+                document.getElementById("loading").style.display = "none";
+                
+                const lineas = textoCsv.split("\n").filter(l => l.trim() !== "");
+                const contenedor = document.getElementById("contenedor-fondos");
+                
+                for (let i = 1; i < lineas.length; i++) {
+                    const columnas = lineas[i].split(";");
+                    if (columnas.length < 4) continue;
+                    
+                    const htmlCard = `
+                        <div class="card">
+                            <div class="fondo-nombre">${columnas[1]}</div>
+                            <div class="fondo-ticker">${columnas[0]}</div>
+                            <div class="datos-fila">
+                                <span>Precio Actual:</span>
+                                <span class="precio">${columnas[2]} €</span>
+                            </div>
+                            <div class="datos-fila">
+                                <span>Fecha Valor:</span>
+                                <span style="color: #64748b;">${columnas[3]}</span>
+                            </div>
+                        </div>
+                    `;
+                    contenedor.innerHTML += htmlCard;
+                }
+            } catch (error) {
+                document.getElementById("loading").innerText = "❌ Error al cargar los datos.";
+            }
+        }
+        cargarCartera();
+    </script>
+</body>
+</html>
