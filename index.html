@@ -5,23 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi Cartera Móvil</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 15px; padding-top: 85px; color: #333; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 15px; padding-top: 110px; color: #333; }
         
-        /* Barra superior fija con el total de la cartera */
+        /* Barra superior fija mejorada para mostrar Total y Rentabilidad Global */
         .header-fijo { position: fixed; top: 0; left: 0; right: 0; background: #1e293b; color: white; padding: 15px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 1000; }
-        .header-titulo { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin: 0; }
-        .header-total { font-size: 26px; font-weight: bold; color: #38bdf8; margin: 5px 0 0 0; }
+        .header-grid { display: flex; justify-content: space-around; align-items: center; margin-top: 5px; }
+        .header-seccion { display: flex; flex-direction: column; }
+        .header-titulo { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin: 0; }
+        .header-total { font-size: 22px; font-weight: bold; color: #38bdf8; margin: 2px 0 0 0; }
+        .header-rentabilidad { font-size: 16px; font-weight: bold; margin: 2px 0 0 0; }
 
         .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 12px; display: flex; flex-direction: column; }
         .fondo-nombre { font-weight: bold; font-size: 16px; color: #0f172a; margin-bottom: 5px; }
         .fondo-ticker { font-size: 12px; color: #64748b; margin-bottom: 12px; }
+        
         .datos-fila { display: flex; justify-content: space-between; font-size: 14px; margin: 4px 0; align-items: center; }
-        .precio { font-weight: bold; color: #059669; }
+        .precio { font-weight: bold; color: #0f172a; }
         .valor-total-fondo { font-weight: bold; color: #1e293b; font-size: 15px; }
         
-        /* Estilos para el cuadro de texto numérico */
-        .input-participaciones { width: 100px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; text-align: right; color: #334155; }
-        .input-participaciones:focus { border-color: #38bdf8; outline: none; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2); }
+        /* Colores dinámicos para ganancias/pérdidas */
+        .positivo { color: #059669 !important; }
+        .negativo { color: #dc2626 !important; }
+        .neutro { color: #64748b !important; }
+        
+        /* Estilos para los cuadros de texto */
+        .inputs-contenedor { display: flex; gap: 10px; justify-content: space-between; margin: 8px 0; }
+        .input-grupo { display: flex; flex-direction: column; width: 48%; }
+        .input-label { font-size: 11px; color: #64748b; margin-bottom: 4px; }
+        .input-cartera { width: 100%; padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; text-align: right; color: #334155; box-sizing: border-box; }
+        .input-cartera:focus { border-color: #38bdf8; outline: none; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2); }
 
         .actualizando { text-align: center; color: #64748b; font-size: 14px; margin-top: 20px; }
     </style>
@@ -29,8 +41,16 @@
 <body>
 
     <div class="header-fijo">
-        <p class="header-titulo">Valor Total de la Cartera</p>
-        <p class="header-total" id="gran-total">0,00 €</p>
+        <div class="header-grid">
+            <div class="header-seccion">
+                <p class="header-titulo">Valor Actual</p>
+                <p class="header-total" id="gran-total">0,00 €</p>
+            </div>
+            <div class="header-seccion" style="border-left: 1px solid #334155; padding-left: 20px;">
+                <p class="header-titulo">Ganancia Total</p>
+                <p class="header-rentabilidad neutro" id="gran-rentabilidad">0,00 € (0,00%)</p>
+            </div>
+        </div>
     </div>
 
     <div id="loading" class="actualizando">Cargando precios...</div>
@@ -38,24 +58,24 @@
 
     <script>
         const URL_CSV = "https://raw.githubusercontent.com/josemiii19/mi-cartera-web/main/precios_actuales_fondos.csv";
-        let fondosDatos = []; // Aquí guardaremos la información limpia de los fondos
+        let fondosDatos = [];
 
-        // Función útil para pasar de formato "1.234,56" (español) a número real de JavaScript (1234.56)
         function limpiarNumeroEspanyol(texto) {
             if (!texto) return 0;
-            // Quitamos puntos de millares si los hubiera y cambiamos la coma por punto
             let limpio = texto.replace(/\./g, "").replace(",", ".");
             return parseFloat(limpio) || 0;
         }
 
-        // Función para formatear los números de JavaScript de vuelta a Euros en Español
         function formatearMoneda(valor) {
             return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(valor);
         }
 
+        function formatearPorcentaje(valor) {
+            return new Intl.NumberFormat('es-ES', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(valor / 100);
+        }
+
         async function cargarCartera() {
             try {
-                // Forzamos que no guarde el CSV en caché del navegador para ver siempre lo último de GitHub
                 const respuesta = await fetch(URL_CSV, { cache: "no-store" });
                 if (!respuesta.ok) throw new Error("No se pudo obtener el archivo");
                 
@@ -65,7 +85,6 @@
                 const lineas = textoCsv.split("\n").filter(l => l.trim() !== "");
                 const contenedor = document.getElementById("contenedor-fondos");
                 
-                // Procesamos el CSV y preparamos los datos
                 for (let i = 1; i < lineas.length; i++) {
                     const columnas = lineas[i].split(";");
                     if (columnas.length < 4) continue;
@@ -77,39 +96,44 @@
                     
                     const precioNum = limpiarNumeroEspanyol(precioTexto);
                     
-                    // Recuperamos las participaciones guardadas en el móvil para este ticker (si no hay, ponemos 0)
-                    const participacionesGuardadas = localStorage.getItem(ticker) || "0";
+                    // Recuperamos los datos guardados en el almacenamiento del móvil
+                    const partGuardadas = localStorage.getItem(`part_${ticker}`) || "0";
+                    const precioMedioGuardado = localStorage.getItem(`pmc_${ticker}`) || "0";
 
                     fondosDatos.push({ ticker, nombre, precioNum, precioTexto, fecha });
 
-                    // Renderizamos la tarjeta del fondo
                     const htmlCard = `
                         <div class="card" id="card-${ticker}">
                             <div class="fondo-nombre">${nombre}</div>
                             <div class="fondo-ticker">${ticker}</div>
                             
                             <div class="datos-fila">
-                                <span>Precio Actual:</span>
+                                <span>Precio de Mercado:</span>
                                 <span class="precio">${precioTexto} €</span>
                             </div>
                             
-                            <div class="datos-fila">
-                                <span>Participaciones:</span>
-                                <input type="number" 
-                                       step="any" 
-                                       inputmode="decimal" 
-                                       class="input-participaciones" 
-                                       id="input-${ticker}" 
-                                       value="${participacionesGuardadas}" 
-                                       oninput="calcularTotales()">
+                            <div class="inputs-contenedor">
+                                <div class="input-grupo">
+                                    <span class="input-label">Participaciones</span>
+                                    <input type="number" step="any" inputmode="decimal" class="input-cartera" id="input-part-${ticker}" value="${partGuardadas}" oninput="calcularTotales()">
+                                </div>
+                                <div class="input-grupo">
+                                    <span class="input-label">Precio Medio Compra (€)</span>
+                                    <input type="number" step="any" inputmode="decimal" class="input-cartera" id="input-pmc-${ticker}" value="${precioMedioGuardado}" oninput="calcularTotales()">
+                                </div>
                             </div>
                             
-                            <div class="datos-fila" style="border-top: 1px dashed #e2e8f0; margin-top: 8px; padding-top: 8px;">
+                            <div class="datos-fila" style="border-top: 1px dashed #e2e8f0; margin-top: 6px; padding-top: 8px;">
                                 <span>Valor de tu posición:</span>
                                 <span class="valor-total-fondo" id="valor-total-${ticker}">0,00 €</span>
                             </div>
+
+                            <div class="datos-fila">
+                                <span>Rentabilidad:</span>
+                                <span id="rentabilidad-${ticker}" class="neutro" style="font-weight: bold;">0,00 € (0,00%)</span>
+                            </div>
                             
-                            <div class="datos-fila" style="font-size: 11px; color: #94a3b8; margin-top: 5px;">
+                            <div class="datos-fila" style="font-size: 11px; color: #94a3b8; margin-top: 4px;">
                                 <span>Fecha Valor:</span>
                                 <span>${fecha}</span>
                             </div>
@@ -118,7 +142,6 @@
                     contenedor.innerHTML += htmlCard;
                 }
 
-                // Una vez creadas las tarjetas, hacemos el primer cálculo en pantalla
                 calcularTotales();
 
             } catch (error) {
@@ -127,31 +150,72 @@
             }
         }
 
-        // Esta función se ejecuta cada vez que escribes o cambias un número
         function calcularTotales() {
-            let granTotalCartera = 0;
+            let granTotalActual = 0;
+            let granTotalInvertido = 0;
 
             fondosDatos.forEach(fondo => {
-                const inputElement = document.getElementById(`input-${fondo.ticker}`);
-                // Cogemos lo que has escrito (reemplazando comas por puntos por si escribes a la española)
-                let participaciones = parseFloat(inputElement.value.replace(",", ".")) || 0;
+                const inputPart = document.getElementById(`input-part-${fondo.ticker}`);
+                const inputPmc = document.getElementById(`input-pmc-${fondo.ticker}`);
+                
+                let participaciones = parseFloat(inputPart.value.replace(",", ".")) || 0;
+                let pmc = parseFloat(inputPmc.value.replace(",", ".")) || 0;
 
-                // 1. Guardamos el valor actual en la memoria del móvil (localStorage) automáticamente
-                localStorage.setItem(fondo.ticker, inputElement.value);
+                // 1. Guardamos de forma persistente ambos inputs en el móvil
+                localStorage.setItem(`part_${fondo.ticker}`, inputPart.value);
+                localStorage.setItem(`pmc_${fondo.ticker}`, inputPmc.value);
 
-                // 2. Calculamos el valor de este fondo concreto (Participaciones * Precio)
-                let valorPosicion = participaciones * fondo.precioNum;
-                granTotalCartera += valorPosicion;
+                // 2. Operaciones matemáticas básicas
+                let valorActualPosicion = participaciones * fondo.precioNum;
+                let capitalInvertidoPosicion = participaciones * pmc;
+                let plusvaliaPosicion = valorActualPosicion - capitalInvertidoPosicion;
+                
+                let porcentajePosicion = 0;
+                if (capitalInvertidoPosicion > 0) {
+                    porcentajePosicion = (plusvaliaPosicion / capitalInvertidoPosicion) * 100;
+                }
 
-                // 3. Lo pintamos formateado en su tarjeta
-                document.getElementById(`valor-total-${fondo.ticker}`).innerText = formatearMoneda(valorPosicion);
+                granTotalActual += valorActualPosicion;
+                granTotalInvertido += capitalInvertidoPosicion;
+
+                // 3. Renderizar resultados individuales del fondo con colores dinámicos
+                document.getElementById(`valor-total-${fondo.ticker}`).innerText = formatearMoneda(valorActualPosicion);
+                
+                const textoRentabilidad = `${formatearMoneda(plusvaliaPosicion)} (${plusvaliaPosicion >= 0 ? '+' : ''}${formatearPorcentaje(porcentajePosicion)})`;
+                const elementoRentabilidad = document.getElementById(`rentabilidad-${fondo.ticker}`);
+                elementoRentabilidad.innerText = textoRentabilidad;
+
+                // Aplicar color según rendimiento
+                if (plusvaliaPosicion > 0) {
+                    elementoRentabilidad.className = "positivo";
+                } else if (plusvaliaPosicion < 0) {
+                    elementoRentabilidad.className = "negativo";
+                } else {
+                    elementoRentabilidad.className = "neutro";
+                }
             });
 
-            // 4. Actualizamos el gran marcador flotante superior con el total de toda la cartera
-            document.getElementById("gran-total").innerText = formatearMoneda(granTotalCartera);
+            // 4. Calcular y renderizar el Marcador Global de la barra superior
+            document.getElementById("gran-total").innerText = formatearMoneda(granTotalActual);
+            
+            let granPlusvalia = granTotalActual - granTotalInvertido;
+            let granPorcentaje = 0;
+            if (granTotalInvertido > 0) {
+                granPorcentaje = (granPlusvalia / granTotalInvertido) * 100;
+            }
+
+            const elementoGranRentabilidad = document.getElementById("gran-rentabilidad");
+            elementoGranRentabilidad.innerText = `${formatearMoneda(granPlusvalia)} (${granPlusvalia >= 0 ? '+' : ''}${formatearPorcentaje(granPorcentaje)})`;
+            
+            if (granPlusvalia > 0) {
+                elementoGranRentabilidad.className = "header-rentabilidad positivo";
+            } else if (granPlusvalia < 0) {
+                elementoGranRentabilidad.className = "header-rentabilidad negativo";
+            } else {
+                elementoGranRentabilidad.className = "header-rentabilidad neutro";
+            }
         }
 
-        // Arrancamos el proceso
         cargarCartera();
     </script>
 </body>
